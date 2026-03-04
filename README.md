@@ -27,19 +27,20 @@
 
 ### Обзор
 <!-- Add screenshot here: docs/images/overview.png -->
-![Overview-placeholder]
+![img.png](docs/img.png)
 
 ### Темы
 <!-- Add screenshot here: docs/images/topics.png -->
-![Topics-placeholder]
+![img_1.png](docs/img_1.png)
 
 ### Сопоставление
 <!-- Add screenshot here: docs/images/comparison.png -->
-![Comparison-placeholder]
+![img_2.png](docs/img_2.png)
+![img_3.png](docs/img_3.png)
 
 ### Статьи
 <!-- Add screenshot here: docs/images/articles.png -->
-![Articles-placeholder]
+![img_4.png](docs/img_4.png)
 
 ## Быстрый старт
 
