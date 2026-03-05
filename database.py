@@ -204,6 +204,20 @@ class Database:
             )
             return cursor.fetchone()["count"]
 
+    def get_existing_urls(self, source_name: str) -> set:
+        """Get all existing URLs for a source (for incremental parsing)."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT a.url FROM articles a
+                JOIN sources s ON a.source_id = s.id
+                WHERE s.name = ? AND a.url IS NOT NULL AND a.url != ''
+            """,
+                (source_name,),
+            )
+            return {row["url"] for row in cursor.fetchall()}
+
     # ============ Topics ============
 
     def insert_topics(self, topics: list[dict]) -> None:

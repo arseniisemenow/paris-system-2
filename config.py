@@ -24,6 +24,13 @@ SOURCES = {
         "base_url": "https://habr.com",
         "feed_url": "https://habr.com/ru/rss/articles/",
     },
+    "hackernews": {
+        "name": "Hacker News",
+        "type": "mass_media",
+        "api_url": "https://hn.algolia.com/api/v1",
+        "max_results": 50,
+        "story_type": "top",  # top, best, new
+    },
 }
 
 # Topic modeling parameters
@@ -224,4 +231,10 @@ PREPROCESSING = {
 COMPARISON = {
     "jaccard_threshold": 0.15,
     "cosine_threshold": 0.3,
+}
+
+# Deduplication thresholds
+DEDUPLICATION = {
+    "title_threshold": 0.7,
+    "content_threshold": 0.85,
 }
