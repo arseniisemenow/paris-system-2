@@ -135,18 +135,21 @@ def render_comparisons(data: dict):
     comparisons_df = pd.DataFrame(data["comparisons"])
 
     # Filter options
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
         show_common = st.toggle("Только общие темы", value=False)
 
     with col2:
-        min_similarity = st.slider("Минимальная схожесть", 0.0, 1.0, 0.15)
+        min_similarity = st.slider("Мин. схожесть (Jaccard)", 0.0, 1.0, 0.1)
+
+    with col3:
+        min_cosine = st.slider("Мин. схожесть (Cosine)", 0.0, 1.0, 0.2)
 
     # Filter
     filtered = comparisons_df[
         (comparisons_df["jaccard_similarity"] >= min_similarity)
-        | (comparisons_df["cosine_similarity"] >= min_similarity)
+        & (comparisons_df["cosine_similarity"] >= min_cosine)
     ]
 
     if show_common:
@@ -154,19 +157,71 @@ def render_comparisons(data: dict):
 
     st.subheader(f"Найдено сопоставлений: {len(filtered)}")
 
-    # Display as table
+    # Display detailed comparisons with keywords
     if not filtered.empty:
-        display_cols = [
-            "source_a",
-            "topic_a",
-            "source_b",
-            "topic_b",
-            "jaccard_similarity",
-            "cosine_similarity",
-            "is_common",
-        ]
-        available_cols = [c for c in display_cols if c in filtered.columns]
-        st.dataframe(filtered[available_cols], use_container_width=True)
+        # Show top comparisons with details
+        st.subheader("📋 Детали сопоставлений")
+
+        # Sort by similarity
+        filtered_sorted = filtered.sort_values(
+            by="cosine_similarity", ascending=False
+        ).head(20)
+
+        for idx, row in filtered_sorted.iterrows():
+            source_a = row.get("source_a", "")
+            source_b = row.get("source_b", "")
+            topic_a = row.get("topic_a", "")
+            topic_b = row.get("topic_b", "")
+            jaccard = row.get("jaccard_similarity", 0)
+            cosine = row.get("cosine_similarity", 0)
+            is_common = row.get("is_common", 0)
+
+            # Get keywords from columns
+            keywords_a_str = row.get("keywords_a", "")
+            keywords_b_str = row.get("keywords_b", "")
+            common_kw_str = row.get("common_keywords", "")
+
+            keywords_a = keywords_a_str.split(",") if keywords_a_str else []
+            keywords_b = keywords_b_str.split(",") if keywords_b_str else []
+            common_kw = common_kw_str.split(",") if common_kw_str else []
+
+            # Color coding for common
+            badge = "🟢" if is_common else "⚪"
+
+            with st.expander(
+                f"{badge} {source_a} ↔ {source_b} | Jaccard: {jaccard:.2f} | Cosine: {cosine:.2f}"
+            ):
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.markdown(f"**{source_a} - {topic_a}**")
+                    st.write("Ключевые слова: " + ", ".join(keywords_a[:8]))
+
+                with col2:
+                    st.markdown(f"**{source_b} - {topic_b}**")
+                    st.write("Ключевые слова: " + ", ".join(keywords_b[:8]))
+
+                # Show common keywords prominently
+                if common_kw and common_kw[0]:
+                    st.markdown("---")
+                    st.markdown(f"**🔗 Общие ключевые слова ({len(common_kw)}):**")
+                    st.success(", ".join(common_kw))
+                else:
+                    st.info("Нет общих ключевых слов (схожесть основана на TF-IDF)")
+
+        # Summary stats
+        st.divider()
+        st.subheader("📊 Статистика")
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Всего сравнений", len(comparisons_df))
+        with col2:
+            common_count = len(comparisons_df[comparisons_df["is_common"] == 1])
+            st.metric("Общих тем", common_count)
+        with col3:
+            avg_sim = comparisons_df["cosine_similarity"].mean()
+            st.metric("Средняя схожесть", f"{avg_sim:.2f}")
 
         # Heatmap of similarities
         if len(filtered) > 0:
@@ -224,18 +279,25 @@ def render_articles(data: dict):
     st.write(f"Статей в {selected_source}: {len(articles)}")
 
     if articles:
-        articles_df = pd.DataFrame(articles)
-
-        # Show article titles
+        # Show article titles with links
         st.subheader("Список статей")
 
         for i, article in enumerate(articles[:50], 1):
-            with st.expander(f"{i}. {article.get('title', 'Без названия')[:80]}..."):
-                st.write(f"**URL:** {article.get('url', 'N/A')}")
+            title = article.get("title", "Без названия")
+            url = article.get("url", "")
+
+            if url:
+                st.markdown(f"{i}. [{title}]({url})")
+            else:
+                st.markdown(f"{i}. {title}")
+
+            # Show in expander for more details
+            with st.expander(f"Детали: {title[:40]}..."):
+                st.write(f"**URL:** [{url}]({url})")
                 st.write(f"**Опубликовано:** {article.get('published_at', 'N/A')}")
                 content = article.get("content", "")
                 if content:
-                    st.write(f"**Содержание:** {content[:300]}...")
+                    st.write(f"**Содержание:** {content[:500]}...")
 
 
 def render_collect_by_topic(data: dict):
@@ -247,7 +309,7 @@ def render_collect_by_topic(data: dict):
 
     # Source selection
     st.subheader("Выберите источники")
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
 
     with col1:
         use_arxiv = st.checkbox("arXiv (академические)", value=True)
@@ -255,6 +317,8 @@ def render_collect_by_topic(data: dict):
         use_habr = st.checkbox("Habr (профессиональные)", value=True)
     with col3:
         use_hn = st.checkbox("Hacker News (СМИ)", value=True)
+    with col4:
+        use_tc = st.checkbox("TechCrunch (СМИ)", value=True)
 
     sources = []
     if use_arxiv:
@@ -263,6 +327,8 @@ def render_collect_by_topic(data: dict):
         sources.append("Habr")
     if use_hn:
         sources.append("Hacker News")
+    if use_tc:
+        sources.append("TechCrunch")
 
     # Max articles per source
     max_per_source = st.slider("Макс. статей на источник", 10, 100, 50, step=10)
@@ -297,11 +363,30 @@ def render_collect_by_topic(data: dict):
 
                 st.success("✅ Анализ завершён!")
 
-                # Show collected articles
-                st.subheader("Собранные статьи")
+                # Show collected articles with links
+                st.subheader("📄 Собранные статьи")
+
+                db = st.session_state.db
+
                 for source_name, count in results.items():
                     if count > 0:
-                        st.write(f"**{source_name}:** {count} статей")
+                        st.markdown(f"**{source_name}** ({count} статей):")
+
+                        articles = db.get_articles_by_source(source_name)
+
+                        # Show up to 10 articles per source with links
+                        for i, article in enumerate(articles[:10], 1):
+                            title = article.get("title", "Без названия")[:60]
+                            url = article.get("url", "")
+                            if url:
+                                st.markdown(f"- [{title}...]({url})")
+                            else:
+                                st.markdown(f"- {title}...")
+
+                        if count > 10:
+                            st.markdown(f"_... и ещё {count - 10} статей_")
+
+                        st.write("")
 
             except Exception as e:
                 st.error(f"❌ Ошибка: {e}")
@@ -360,7 +445,7 @@ def analyze_topics_for_sources(db: Database, source_names: list[str]):
                 "topic_id": t["topic_id"],
                 "name": t["name"],
                 "keywords": ",".join(t["keywords"]),
-                "article_count": len(texts),
+                "article_count": t.get("article_count", 0),
             }
             for t in topics
         ]

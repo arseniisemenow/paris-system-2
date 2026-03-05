@@ -234,7 +234,7 @@ def analyze_topics(db: Database) -> None:
                 "topic_id": t["topic_id"],
                 "name": t["name"],
                 "keywords": ",".join(t["keywords"]),
-                "article_count": len(texts),
+                "article_count": t.get("article_count", 0),
             }
             for t in topics
         ]
@@ -303,18 +303,36 @@ def compare_topics(db: Database) -> None:
 
     if all_comparisons:
         # Convert keyword lists to strings for DB
-        comp_dicts = [
-            {
-                "source_a": c["source_a"],
-                "source_b": c["source_b"],
-                "topic_a": c["topic_a"],
-                "topic_b": c["topic_b"],
-                "jaccard_similarity": c["jaccard_similarity"],
-                "cosine_similarity": c["cosine_similarity"],
-                "is_common": 1 if c["is_common"] else 0,
-            }
-            for c in all_comparisons
-        ]
+        comp_dicts = []
+        for c in all_comparisons:
+            # Get keywords
+            keywords_a = c.get("keywords_a", [])
+            keywords_b = c.get("keywords_b", [])
+
+            # Find common keywords
+            if isinstance(keywords_a, list) and isinstance(keywords_b, list):
+                common_kw = list(set(keywords_a) & set(keywords_b))
+            else:
+                common_kw = []
+
+            comp_dicts.append(
+                {
+                    "source_a": c["source_a"],
+                    "source_b": c["source_b"],
+                    "topic_a": c["topic_a"],
+                    "topic_b": c["topic_b"],
+                    "keywords_a": ",".join(keywords_a[:10])
+                    if isinstance(keywords_a, list)
+                    else "",
+                    "keywords_b": ",".join(keywords_b[:10])
+                    if isinstance(keywords_b, list)
+                    else "",
+                    "common_keywords": ",".join(common_kw) if common_kw else "",
+                    "jaccard_similarity": c["jaccard_similarity"],
+                    "cosine_similarity": c["cosine_similarity"],
+                    "is_common": 1 if c["is_common"] else 0,
+                }
+            )
 
         db.insert_comparisons(comp_dicts)
 
@@ -403,9 +421,10 @@ def collect_by_topic(
     from collectors.arxiv_collector import ArxivCollector
     from collectors.habr_collector import HabrCollector
     from collectors.hackernews_collector import HackerNewsCollector
+    from collectors.techcrunch_collector import TechCrunchCollector
 
     if sources is None:
-        sources = ["arXiv", "Habr", "Hacker News"]
+        sources = ["arXiv", "Habr", "Hacker News", "TechCrunch"]
 
     results = {}
     all_articles = []
@@ -414,6 +433,7 @@ def collect_by_topic(
         "arXiv": ArxivCollector(),
         "Habr": HabrCollector(),
         "Hacker News": HackerNewsCollector(),
+        "TechCrunch": TechCrunchCollector(),
     }
 
     print(f"\n🔍 Поиск статей по теме: '{topic}'")

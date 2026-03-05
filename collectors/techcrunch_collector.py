@@ -1,8 +1,7 @@
 """
-Habr RSS collector.
+TechCrunch RSS collector.
 """
 
-import re
 from datetime import datetime
 from typing import Optional
 
@@ -13,19 +12,19 @@ import config
 from collectors.base import BaseCollector
 
 
-class HabrCollector(BaseCollector):
-    """Collector for Habr RSS feed."""
+class TechCrunchCollector(BaseCollector):
+    """Collector for TechCrunch RSS feed."""
 
     def __init__(self):
-        super().__init__("habr")
+        super().__init__("techcrunch")
         self.feed_url = self.source_config.get(
-            "feed_url", "https://habr.com/ru/rss/articles/"
+            "feed_url", "https://techcrunch.com/feed/"
         )
 
     def fetch_articles(
         self, max_results: Optional[int] = None, topic: Optional[str] = None
     ) -> list[dict]:
-        """Fetch articles from Habr RSS feed.
+        """Fetch articles from TechCrunch RSS feed.
 
         Args:
             max_results: Maximum number of articles to fetch
@@ -134,15 +133,15 @@ class HabrCollector(BaseCollector):
         return None
 
 
-def fetch_habr_articles(max_results: int = 50) -> list[dict]:
-    """Convenience function to fetch Habr articles."""
-    collector = HabrCollector()
+def fetch_techcrunch_articles(max_results: int = 50) -> list[dict]:
+    """Convenience function to fetch TechCrunch articles."""
+    collector = TechCrunchCollector()
     return collector.fetch_articles(max_results)
 
 
 if __name__ == "__main__":
-    articles = fetch_habr_articles(10)
-    print(f"Fetched {len(articles)} articles from Habr")
+    articles = fetch_techcrunch_articles(10)
+    print(f"Fetched {len(articles)} articles from TechCrunch")
     for i, article in enumerate(articles[:3], 1):
         print(f"\n{i}. {article['title'][:80]}")
         print(f"   URL: {article['url']}")

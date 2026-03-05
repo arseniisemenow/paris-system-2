@@ -89,6 +89,9 @@ class Database:
                     source_b TEXT NOT NULL,
                     topic_a TEXT NOT NULL,
                     topic_b TEXT NOT NULL,
+                    keywords_a TEXT,
+                    keywords_b TEXT,
+                    common_keywords TEXT,
                     jaccard_similarity REAL,
                     cosine_similarity REAL,
                     is_common INTEGER DEFAULT 0
@@ -268,8 +271,8 @@ class Database:
             cursor.executemany(
                 """
                 INSERT INTO topic_comparisons 
-                (source_a, source_b, topic_a, topic_b, jaccard_similarity, cosine_similarity, is_common)
-                VALUES (:source_a, :source_b, :topic_a, :topic_b, :jaccard_similarity, :cosine_similarity, :is_common)
+                (source_a, source_b, topic_a, topic_b, keywords_a, keywords_b, common_keywords, jaccard_similarity, cosine_similarity, is_common)
+                VALUES (:source_a, :source_b, :topic_a, :topic_b, :keywords_a, :keywords_b, :common_keywords, :jaccard_similarity, :cosine_similarity, :is_common)
             """,
                 comparisons,
             )

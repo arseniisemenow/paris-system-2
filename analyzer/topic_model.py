@@ -35,11 +35,15 @@ class TopicModeler:
         self.feature_names = None
         self.doc_topic_matrix = None
         self.is_fitted = False
+        self._last_texts = None  # Store for get_topics
 
     def fit(self, texts: list[str]) -> "TopicModeler":
         """Fit the topic model on texts."""
         if not texts:
             raise ValueError("Cannot fit on empty text corpus")
+
+        # Store texts for later use in get_topics
+        self._last_texts = texts
 
         # Vectorize
         doc_term_matrix = self.vectorizer.fit_transform(texts)
@@ -68,9 +72,15 @@ class TopicModeler:
         return self
 
     def get_topics(self, n_words: int = 10) -> list[dict]:
-        """Get top words for each topic."""
+        """Get top words for each topic with article counts."""
         if not self.is_fitted:
             raise ValueError("Model not fitted yet")
+
+        # Get dominant topic for each document
+        doc_topic_matrix = self.model.transform(
+            self.vectorizer.transform(self._last_texts)
+        )
+        dominant_topics = doc_topic_matrix.argmax(axis=1)
 
         topics = []
 
@@ -79,11 +89,15 @@ class TopicModeler:
             top_word_indices = topic.argsort()[: -n_words - 1 : -1]
             top_words = [self.feature_names[i] for i in top_word_indices]
 
+            # Count articles belonging to this topic
+            topic_article_count = int((dominant_topics == topic_idx).sum())
+
             topics.append(
                 {
                     "topic_id": topic_idx,
                     "keywords": top_words,
                     "name": f"Topic {topic_idx}: {', '.join(top_words[:3])}",
+                    "article_count": topic_article_count,
                 }
             )
 

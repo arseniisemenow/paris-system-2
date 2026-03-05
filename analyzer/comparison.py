@@ -57,11 +57,25 @@ class TopicComparator:
         comparisons = []
 
         for topic_a in topics_a:
-            keywords_a = set(topic_a.get("keywords", []))
+            # Handle both string (comma-separated) and list keywords
+            kw_a_raw = topic_a.get("keywords", "")
+            if isinstance(kw_a_raw, str) and kw_a_raw:
+                keywords_a = set(kw_a_raw.split(","))
+            elif isinstance(kw_a_raw, list):
+                keywords_a = set(kw_a_raw)
+            else:
+                keywords_a = set()
             topic_a_name = topic_a.get("name", f"Topic {topic_a.get('topic_id')}")
 
             for topic_b in topics_b:
-                keywords_b = set(topic_b.get("keywords", []))
+                # Handle both string (comma-separated) and list keywords
+                kw_b_raw = topic_b.get("keywords", "")
+                if isinstance(kw_b_raw, str) and kw_b_raw:
+                    keywords_b = set(kw_b_raw.split(","))
+                elif isinstance(kw_b_raw, list):
+                    keywords_b = set(kw_b_raw)
+                else:
+                    keywords_b = set()
                 topic_b_name = topic_b.get("name", f"Topic {topic_b.get('topic_id')}")
 
                 # Calculate similarities

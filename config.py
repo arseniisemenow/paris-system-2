@@ -31,6 +31,12 @@ SOURCES = {
         "max_results": 50,
         "story_type": "top",  # top, best, new
     },
+    "techcrunch": {
+        "name": "TechCrunch",
+        "type": "mass_media",
+        "feed_url": "https://techcrunch.com/feed/",
+        "max_results": 50,
+    },
 }
 
 # Topic modeling parameters
