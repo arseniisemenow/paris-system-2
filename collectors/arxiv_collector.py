@@ -23,15 +23,32 @@ class ArxivCollector(BaseCollector):
         self.categories = self.source_config.get("categories", ["cs.LG"])
         self.max_results = self.source_config.get("max_results", 100)
 
-    def fetch_articles(self, max_results: Optional[int] = None) -> list[dict]:
+    def fetch_articles(
+        self, max_results: Optional[int] = None, topic: Optional[str] = None
+    ) -> list[dict]:
         """Fetch articles from arXiv API.
+
+        Args:
+            max_results: Maximum number of articles to fetch
+            topic: Optional topic/keyword to filter by (searches in title)
 
         Uses official arXiv API - no rate limiting issues.
         """
         max_results = max_results or self.max_results
 
-        # Build query for multiple categories
-        query = " OR ".join(f"cat:{cat}" for cat in self.categories)
+        # Build query
+        query_parts = []
+
+        # Add topic filter if provided
+        if topic:
+            query_parts.append(f"all:{topic}")
+
+        # Add categories
+        cat_query = " OR ".join(f"cat:{cat}" for cat in self.categories)
+        query_parts.append(cat_query)
+
+        query = " AND ".join(query_parts)
+
         params = {
             "search_query": query,
             "start": 0,

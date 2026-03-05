@@ -383,5 +383,113 @@ def main():
         run_pipeline(db)
 
 
+def collect_by_topic(
+    db: Database,
+    topic: str,
+    sources: list[str] = None,
+    max_per_source: int = 100,
+) -> dict:
+    """Collect articles by topic from selected sources.
+
+    Args:
+        db: Database instance
+        topic: Topic/keyword to search for
+        sources: List of source names (default: all)
+        max_per_source: Max articles per source
+
+    Returns:
+        Dict with collection results per source
+    """
+    from collectors.arxiv_collector import ArxivCollector
+    from collectors.habr_collector import HabrCollector
+    from collectors.hackernews_collector import HackerNewsCollector
+
+    if sources is None:
+        sources = ["arXiv", "Habr", "Hacker News"]
+
+    results = {}
+    all_articles = []
+
+    source_collectors = {
+        "arXiv": ArxivCollector(),
+        "Habr": HabrCollector(),
+        "Hacker News": HackerNewsCollector(),
+    }
+
+    print(f"\n🔍 Поиск статей по теме: '{topic}'")
+    print("-" * 40)
+
+    for source_name in sources:
+        if source_name not in source_collectors:
+            print(f"  ⚠️ Неизвестный источник: {source_name}")
+            continue
+
+        print(f"  → {source_name}...")
+        try:
+            collector = source_collectors[source_name]
+            articles = collector.fetch_articles(max_per_source, topic=topic)
+
+            # Get source ID
+            source_id = db.get_or_create_source(
+                name=source_name,
+                source_type=config.SOURCES.get(
+                    source_name.lower().replace(" ", ""), {"type": "unknown"}
+                ).get("type", "unknown"),
+                url=config.SOURCES.get(source_name.lower().replace(" ", ""), {}).get(
+                    "api_url", ""
+                ),
+            )
+
+            # Get existing URLs for incremental
+            existing_urls = db.get_existing_urls(source_name)
+            new_articles = [a for a in articles if a.get("url") not in existing_urls]
+
+            # Insert new articles
+            article_dicts = [
+                {
+                    "source_id": source_id,
+                    "title": a["title"],
+                    "content": a["content"],
+                    "url": a["url"],
+                    "published_at": a["published_at"],
+                }
+                for a in new_articles
+            ]
+
+            if article_dicts:
+                db.insert_articles_bulk(article_dicts)
+
+            # Update source
+            total_count = db.get_article_count_by_source(source_name)
+            db.update_source_fetch(source_id, total_count)
+
+            # Add to all for deduplication
+            for a in new_articles:
+                a["source"] = source_name
+            all_articles.extend(new_articles)
+
+            results[source_name] = len(new_articles)
+            print(
+                f"    Найдено {len(new_articles)} новых статей (всего: {total_count})"
+            )
+
+        except Exception as e:
+            print(f"    ❌ Ошибка: {e}")
+            results[source_name] = 0
+
+    # Cross-source deduplication
+    if all_articles:
+        print(f"\n🔄 Дедупликация...")
+        unique = deduplicate_articles(all_articles)
+        dupes = len(all_articles) - len(unique)
+        if dupes > 0:
+            print(f"    Удалено {dupes} дубликатов")
+
+    total = sum(results.values())
+    print(f"\n✅ Собрано {total} статей по теме '{topic}'")
+
+    return results
+
+
 if __name__ == "__main__":
     main()

@@ -16,12 +16,19 @@ import plotly.graph_objects as go
 
 from database import Database
 from config import DATABASE_PATH
+from main import collect_by_topic
+from analyzer.preprocessing import TextPreprocessor
+from analyzer.topic_model import TopicModeler
+from analyzer.comparison import TopicComparator
+import config
 
 
 def init_session_state():
     """Initialize Streamlit session state."""
     if "db" not in st.session_state:
         st.session_state.db = Database(DATABASE_PATH)
+    if "sources" not in st.session_state:
+        st.session_state.sources = ["arXiv", "Habr", "Hacker News"]
 
 
 def load_data():
@@ -231,6 +238,179 @@ def render_articles(data: dict):
                     st.write(f"**Содержание:** {content[:300]}...")
 
 
+def render_collect_by_topic(data: dict):
+    """Render topic-based collection page."""
+    st.header("🔍 Сбор по теме")
+
+    # Topic input
+    topic = st.text_input("Введите тему для поиска", value="AI").strip()
+
+    # Source selection
+    st.subheader("Выберите источники")
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        use_arxiv = st.checkbox("arXiv (академические)", value=True)
+    with col2:
+        use_habr = st.checkbox("Habr (профессиональные)", value=True)
+    with col3:
+        use_hn = st.checkbox("Hacker News (СМИ)", value=True)
+
+    sources = []
+    if use_arxiv:
+        sources.append("arXiv")
+    if use_habr:
+        sources.append("Habr")
+    if use_hn:
+        sources.append("Hacker News")
+
+    # Max articles per source
+    max_per_source = st.slider("Макс. статей на источник", 10, 100, 50, step=10)
+
+    # Collect button
+    if st.button("🚀 Собрать статьи", type="primary"):
+        if not topic:
+            st.error("Введите тему для поиска")
+            return
+
+        if not sources:
+            st.error("Выберите хотя бы один источник")
+            return
+
+        with st.spinner("Сбор статей..."):
+            db = st.session_state.db
+
+            try:
+                results = collect_by_topic(
+                    db,
+                    topic=topic,
+                    sources=sources,
+                    max_per_source=max_per_source,
+                )
+
+                # Show results
+                st.success(f"✅ Собрано статей: {sum(results.values())}")
+
+                # Run analysis
+                st.info("Запуск анализа тем...")
+                analyze_topics_for_sources(db, sources)
+
+                st.success("✅ Анализ завершён!")
+
+                # Show collected articles
+                st.subheader("Собранные статьи")
+                for source_name, count in results.items():
+                    if count > 0:
+                        st.write(f"**{source_name}:** {count} статей")
+
+            except Exception as e:
+                st.error(f"❌ Ошибка: {e}")
+
+    # Show current stats
+    st.divider()
+    st.subheader("📊 Текущая статистика")
+
+    db = st.session_state.db
+    sources_data = db.get_all_sources()
+
+    for s in sources_data:
+        count = db.get_article_count_by_source(s["name"])
+        st.write(f"  **{s['name']}**: {count} статей ({s['source_type']})")
+
+
+def analyze_topics_for_sources(db: Database, source_names: list[str]):
+    """Analyze topics for selected sources."""
+    # Clear old topics and comparisons
+    db.clear_topics()
+    db.clear_comparisons()
+
+    preprocessor = TextPreprocessor()
+    sources = db.get_all_sources()
+
+    for source in sources:
+        if source["name"] not in source_names:
+            continue
+
+        articles = db.get_articles_by_source(source["name"])
+        if not articles:
+            continue
+
+        # Preprocess
+        texts = []
+        for article in articles:
+            content = article.get("content", "")
+            title = article.get("title", "")
+            combined = f"{title} {content}"
+            texts.append(preprocessor.preprocess(combined))
+
+        texts = [t for t in texts if t.strip()]
+
+        if len(texts) < 3:
+            continue
+
+        # Topic modeling
+        modeler = TopicModeler(n_topics=min(7, len(texts) // 3))
+        modeler.fit(texts)
+        topics = modeler.get_topics(n_words=10)
+
+        # Save
+        topic_dicts = [
+            {
+                "source_id": source["id"],
+                "topic_id": t["topic_id"],
+                "name": t["name"],
+                "keywords": ",".join(t["keywords"]),
+                "article_count": len(texts),
+            }
+            for t in topics
+        ]
+        db.insert_topics(topic_dicts)
+
+    # Compare topics
+    all_topics = db.get_all_topics()
+    if not all_topics:
+        return
+
+    topics_by_source = {}
+    for topic in all_topics:
+        source_id = topic["source_id"]
+        source_name = next(
+            (s["name"] for s in sources if s["id"] == source_id), "unknown"
+        )
+        if source_name not in topics_by_source:
+            topics_by_source[source_name] = []
+        topics_by_source[source_name].append(topic)
+
+    comparator = TopicComparator()
+    all_comparisons = []
+    source_names_list = list(topics_by_source.keys())
+
+    for i, source_a in enumerate(source_names_list):
+        for source_b in source_names_list[i + 1 :]:
+            topics_a = topics_by_source[source_a]
+            topics_b = topics_by_source[source_b]
+
+            comparisons = comparator.compare_topics(
+                topics_a, topics_b, source_a, source_b
+            )
+            all_comparisons.extend(comparisons)
+
+    if all_comparisons:
+        comp_dicts = [
+            {
+                "source_a": c["source_a"],
+                "source_b": c["source_b"],
+                "topic_a": c["topic_a"],
+                "topic_b": c["topic_b"],
+                "jaccard_similarity": c["jaccard_similarity"],
+                "cosine_similarity": c["cosine_similarity"],
+                "is_common": 1 if c["is_common"] else 0,
+            }
+            for c in all_comparisons
+        ]
+        db.insert_comparisons(comp_dicts)
+
+
 def main():
     """Main Streamlit app."""
     st.set_page_config(
@@ -252,6 +432,7 @@ def main():
         "Темы": render_topics,
         "Сопоставление": render_comparisons,
         "Статьи": render_articles,
+        "Сбор по теме": render_collect_by_topic,
     }
 
     selected_page = st.sidebar.radio("Навигация", list(pages.keys()))

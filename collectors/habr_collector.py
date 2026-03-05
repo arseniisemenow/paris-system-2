@@ -22,11 +22,20 @@ class HabrCollector(BaseCollector):
             "feed_url", "https://habr.com/ru/rss/articles/"
         )
 
-    def fetch_articles(self, max_results: Optional[int] = None) -> list[dict]:
+    def fetch_articles(
+        self, max_results: Optional[int] = None, topic: Optional[str] = None
+    ) -> list[dict]:
         """Fetch articles from Habr RSS feed.
+
+        Args:
+            max_results: Maximum number of articles to fetch
+            topic: Optional topic/keyword to filter by (searches in title)
 
         Uses RSS which is allowed for scraping.
         """
+        # Fetch more if filtering by topic
+        fetch_limit = max_results * 5 if topic else (max_results or 50)
+
         response = requests.get(
             self.feed_url,
             headers={
@@ -37,7 +46,20 @@ class HabrCollector(BaseCollector):
         )
         response.raise_for_status()
 
-        return self._parse_rss(response.text, max_results)
+        articles = self._parse_rss(response.text, fetch_limit)
+
+        # Filter by topic if provided
+        if topic:
+            topic_lower = topic.lower()
+            articles = [
+                a for a in articles if topic_lower in a.get("title", "").lower()
+            ]
+
+        # Limit results
+        if max_results:
+            articles = articles[:max_results]
+
+        return articles
 
     def _parse_rss(
         self, xml_content: str, max_results: Optional[int] = None

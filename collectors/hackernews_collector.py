@@ -22,8 +22,14 @@ class HackerNewsCollector(BaseCollector):
         self.max_results = self.source_config.get("max_results", 50)
         self.story_type = self.source_config.get("story_type", "top")
 
-    def fetch_articles(self, max_results: Optional[int] = None) -> list[dict]:
+    def fetch_articles(
+        self, max_results: Optional[int] = None, topic: Optional[str] = None
+    ) -> list[dict]:
         """Fetch articles from Hacker News Algolia API.
+
+        Args:
+            max_results: Maximum number of articles to fetch
+            topic: Optional topic/keyword to filter by (searches in title)
 
         Uses Algolia API which is faster than Firebase.
         """
@@ -35,10 +41,14 @@ class HackerNewsCollector(BaseCollector):
         else:
             endpoint = "/search"
 
+        # Add query parameter for topic search
         params = {
             "tags": "story",
             "hitsPerPage": max_results,
         }
+
+        if topic:
+            params["query"] = topic
 
         response = requests.get(
             f"{self.api_url}{endpoint}",
