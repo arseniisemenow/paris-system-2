@@ -1,111 +1,40 @@
 # Topic Matcher
 
-Инструмент для сопоставления тематик из различных источников: академические публикации, профессиональные сообщества и массовая информация.
+Инструмент для сопоставления тематик из различных источников.
 
-## Что умеет проект
+## Установка
 
-- 📥 **Сбор данных** из различных источников
-  - arXiv API (академические публикации)
-  - Habr RSS (профессиональные статьи)
-  - Легко добавить новые источники
+```bash
+poetry install
+```
 
-- 🔍 **Тематическое моделирование**
-  - LDA (Latent Dirichlet Allocation)
-  - Извлечение ключевых слов из текста
+## Использование
 
-- 🔄 **Сопоставление тем**
-  - Сравнение тем между источниками
-  - Jaccard similarity и косинусное сходство
-  - Выявление общих тем и уникальных
+```bash
+# Запуск UI
+poetry run python main.py ui
 
-- 📊 **Веб-интерфейс**
-  - Дашборд со статистикой
-  - Просмотр тем и статей
-  - Тепловая карта схожести тем
+# Полный анализ (сбор + анализ + сравнение)
+poetry run python main.py
+
+# Отдельные команды
+poetry run python main.py collect   # только сбор данных
+poetry run python main.py analyze    # только анализ тем
+poetry run python main.py compare    # только сравнение
+```
 
 ## Скриншоты
 
-### Обзор
-<!-- Add screenshot here: docs/images/overview.png -->
-![img.png](docs/img.png)
+![Обзор](docs/img.png)
 
-### Темы
-<!-- Add screenshot here: docs/images/topics.png -->
-![img_1.png](docs/img_1.png)
+![Темы](docs/img_1.png)
 
-### Сопоставление
-<!-- Add screenshot here: docs/images/comparison.png -->
-![img_2.png](docs/img_2.png)
-![img_3.png](docs/img_3.png)
+![Сопоставление](docs/img_2.png)
 
-### Статьи
-<!-- Add screenshot here: docs/images/articles.png -->
-![img_4.png](docs/img_4.png)
-
-## Быстрый старт
-
-```bash
-# Установка зависимостей
-pip install -r requirements.txt
-
-# Активация виртуального окружения
-source venv/bin/activate
-
-# Запуск полного анализа
-python main.py
-
-# Запуск веб-интерфейса
-streamlit run ui/app.py
-```
-
-## Структура проекта
-
-```
-topic-matcher/
-├── config.py                 # Конфигурация
-├── database.py               # SQLite база данных
-├── models.py                 # Модели данных
-├── main.py                   # Точка входа
-│
-├── collectors/               # Сборщики данных
-│   ├── arxiv_collector.py
-│   └── habr_collector.py
-│
-├── analyzer/                 # Анализ
-│   ├── preprocessing.py
-│   ├── topic_model.py
-│   └── comparison.py
-│
-├── ui/                      # Интерфейс
-│   └── app.py              # Streamlit
-│
-└── tests/                   # Тесты
-```
-
-## Команды
-
-| Команда | Описание |
-|---------|----------|
-| `python main.py` | Полный анализ |
-| `python main.py --collect-only` | Только сбор данных |
-| `python main.py --analyze-only` | Только анализ тем |
-| `python main.py --compare-only` | Только сравнение |
-| `streamlit run ui/app.py` | Запуск UI |
+![Статьи](docs/img_3.png)
 
 ## Тесты
 
 ```bash
-pytest tests/ -v
+poetry run pytest tests/
 ```
-
-## Технологии
-
-- Python 3.12+
-- SQLite
-- scikit-learn (LDA)
-- Streamlit
-- Plotly
-
-## Лицензия
-
-MIT
