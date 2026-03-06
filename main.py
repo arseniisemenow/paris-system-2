@@ -369,6 +369,13 @@ def main():
     )
 
     parser.add_argument(
+        "command",
+        nargs="?",
+        default=None,
+        help="Command to run: ui, collect, analyze, compare, pipeline",
+    )
+
+    parser.add_argument(
         "--collect-only",
         action="store_true",
         help="Only collect data, skip analysis",
@@ -388,17 +395,36 @@ def main():
 
     args = parser.parse_args()
 
+    # Handle 'ui' command
+    if args.command == "ui":
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        ui_path = Path(__file__).parent / "ui" / "app.py"
+        print(f"🚀 Starting Streamlit UI...")
+        print(f"   Open http://localhost:8501 in your browser")
+        subprocess.run([sys.executable, "-m", "streamlit", "run", str(ui_path)])
+        return
+
     # Initialize database
     db = Database(config.DATABASE_PATH)
 
-    if args.collect_only:
+    # Route based on command
+    if args.command == "collect":
         collect_data(db)
-    elif args.analyze_only:
+    elif args.command == "analyze":
         analyze_topics(db)
-    elif args.compare_only:
+    elif args.command == "compare":
         compare_topics(db)
-    else:
+    elif args.command == "pipeline":
         run_pipeline(db)
+    elif args.command is None:
+        run_pipeline(db)
+    else:
+        print(f"Unknown command: {args.command}")
+        print("Available: ui, collect, analyze, compare, pipeline")
+        parser.print_help()
 
 
 def collect_by_topic(
