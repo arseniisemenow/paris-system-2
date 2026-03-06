@@ -18,8 +18,9 @@ from analyzer.keywords import extract_keywords_list
 import config
 
 
-# Lazy-loaded keyword extractor (to avoid loading model at import time)
+# Lazy-loaded modules (to avoid loading models at import time)
 _keyword_extractor = None
+_scraper = None
 
 
 def _get_keyword_extractor():
@@ -33,6 +34,44 @@ def _get_keyword_extractor():
             ngram_range=config.KEYWORDS["ngram_range"],
         )
     return _keyword_extractor
+
+
+def _get_scraper():
+    """Get or create article scraper instance."""
+    global _scraper
+    if _scraper is None:
+        from analyzer.scraper import ArticleScraper
+
+        _scraper = ArticleScraper()
+    return _scraper
+
+
+def _scrape_full_content(articles: list[dict]) -> list[dict]:
+    """Scrape full article content if enabled in config.
+
+    Args:
+        articles: List of article dicts with 'url' field
+
+    Returns:
+        Articles with potentially updated 'content' field
+    """
+    if not config.FULL_TEXT["enabled"]:
+        return articles
+
+    scraper = _get_scraper()
+
+    for article in articles:
+        url = article.get("url", "")
+        current_content = article.get("content", "")
+
+        # Only scrape if current content is empty or very short
+        # and URL is available
+        if url and len(current_content) < 500:
+            full_content = scraper.scrape(url)
+            if full_content:
+                article["content"] = full_content
+
+    return articles
 
 
 def _extract_keywords_for_articles(articles: list[dict]) -> list[dict]:
@@ -82,6 +121,11 @@ def collect_data(db: Database) -> dict:
         # Incremental: Get existing URLs, filter new ones
         existing_urls = db.get_existing_urls("arXiv")
         new_articles = [a for a in articles if a.get("url") not in existing_urls]
+
+        # Scrape full content if enabled
+        if config.FULL_TEXT["enabled"] and new_articles:
+            print(f"    Скачивание полного текста статей...")
+            new_articles = _scrape_full_content(new_articles)
 
         # Extract keywords for new articles
         print(f"    Извлечение ключевых слов из {len(new_articles)} статей...")
@@ -133,6 +177,11 @@ def collect_data(db: Database) -> dict:
         existing_urls = db.get_existing_urls("Habr")
         new_articles = [a for a in articles if a.get("url") not in existing_urls]
 
+        # Scrape full content if enabled
+        if config.FULL_TEXT["enabled"] and new_articles:
+            print(f"    Скачивание полного текста статей...")
+            new_articles = _scrape_full_content(new_articles)
+
         # Extract keywords
         print(f"    Извлечение ключевых слов из {len(new_articles)} статей...")
         new_articles = _extract_keywords_for_articles(new_articles)
@@ -183,6 +232,11 @@ def collect_data(db: Database) -> dict:
         # Incremental: Get existing URLs, filter new ones
         existing_urls = db.get_existing_urls("Hacker News")
         new_articles = [a for a in articles if a.get("url") not in existing_urls]
+
+        # Scrape full content if enabled
+        if config.FULL_TEXT["enabled"] and new_articles:
+            print(f"    Скачивание полного текста статей...")
+            new_articles = _scrape_full_content(new_articles)
 
         # Extract keywords
         print(f"    Извлечение ключевых слов из {len(new_articles)} статей...")
@@ -550,6 +604,10 @@ def collect_by_topic(
             # Get existing URLs for incremental
             existing_urls = db.get_existing_urls(source_name)
             new_articles = [a for a in articles if a.get("url") not in existing_urls]
+
+            # Scrape full content if enabled
+            if config.FULL_TEXT["enabled"] and new_articles:
+                new_articles = _scrape_full_content(new_articles)
 
             # Extract keywords
             new_articles = _extract_keywords_for_articles(new_articles)

@@ -54,6 +54,13 @@ KEYWORDS = {
     "min_df": 1,  # Minimum document frequency
 }
 
+# Full text scraping (optional)
+FULL_TEXT = {
+    "enabled": True,  # Set to False to skip scraping full articles
+    "timeout": 30,  # Request timeout in seconds
+    "max_length": 50000,  # Max characters to store per article
+}
+
 # Preprocessing parameters
 PREPROCESSING = {
     "min_word_length": 3,
