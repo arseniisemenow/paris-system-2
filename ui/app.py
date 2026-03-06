@@ -347,7 +347,7 @@ def render_collect_by_topic(data: dict):
             db = st.session_state.db
 
             try:
-                results = collect_by_topic(
+                results, new_articles = collect_by_topic(
                     db,
                     topic=topic,
                     sources=sources,
@@ -363,19 +363,25 @@ def render_collect_by_topic(data: dict):
 
                 st.success("✅ Анализ завершён!")
 
-                # Show collected articles with links
+                # Show ONLY newly collected articles
                 st.subheader("📄 Собранные статьи")
 
-                db = st.session_state.db
+                # Group new articles by source
+                articles_by_source = {}
+                for article in new_articles:
+                    source = article.get("source", "Unknown")
+                    if source not in articles_by_source:
+                        articles_by_source[source] = []
+                    articles_by_source[source].append(article)
 
                 for source_name, count in results.items():
                     if count > 0:
                         st.markdown(f"**{source_name}** ({count} статей):")
 
-                        articles = db.get_articles_by_source(source_name)
+                        articles = articles_by_source.get(source_name, [])
 
                         # Show up to 10 articles per source with links
-                        for i, article in enumerate(articles[:10], 1):
+                        for article in articles[:10]:
                             title = article.get("title", "Без названия")[:60]
                             url = article.get("url", "")
                             if url:
@@ -481,18 +487,35 @@ def analyze_topics_for_sources(db: Database, source_names: list[str]):
             all_comparisons.extend(comparisons)
 
     if all_comparisons:
-        comp_dicts = [
-            {
-                "source_a": c["source_a"],
-                "source_b": c["source_b"],
-                "topic_a": c["topic_a"],
-                "topic_b": c["topic_b"],
-                "jaccard_similarity": c["jaccard_similarity"],
-                "cosine_similarity": c["cosine_similarity"],
-                "is_common": 1 if c["is_common"] else 0,
-            }
-            for c in all_comparisons
-        ]
+        comp_dicts = []
+        for c in all_comparisons:
+            keywords_a = c.get("keywords_a", [])
+            keywords_b = c.get("keywords_b", [])
+
+            # Find common keywords
+            if isinstance(keywords_a, list) and isinstance(keywords_b, list):
+                common_kw = list(set(keywords_a) & set(keywords_b))
+            else:
+                common_kw = []
+
+            comp_dicts.append(
+                {
+                    "source_a": c["source_a"],
+                    "source_b": c["source_b"],
+                    "topic_a": c["topic_a"],
+                    "topic_b": c["topic_b"],
+                    "keywords_a": ",".join(keywords_a[:10])
+                    if isinstance(keywords_a, list)
+                    else "",
+                    "keywords_b": ",".join(keywords_b[:10])
+                    if isinstance(keywords_b, list)
+                    else "",
+                    "common_keywords": ",".join(common_kw) if common_kw else "",
+                    "jaccard_similarity": float(c["jaccard_similarity"]),
+                    "cosine_similarity": float(c["cosine_similarity"]),
+                    "is_common": 1 if bool(c["is_common"]) else 0,
+                }
+            )
         db.insert_comparisons(comp_dicts)
 
 

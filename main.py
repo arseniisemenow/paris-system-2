@@ -14,7 +14,51 @@ from analyzer.preprocessing import TextPreprocessor
 from analyzer.topic_model import TopicModeler
 from analyzer.comparison import TopicComparator
 from analyzer.deduplicator import deduplicate_articles
+from analyzer.keywords import extract_keywords_list
 import config
+
+
+# Lazy-loaded keyword extractor (to avoid loading model at import time)
+_keyword_extractor = None
+
+
+def _get_keyword_extractor():
+    """Get or create keyword extractor instance."""
+    global _keyword_extractor
+    if _keyword_extractor is None:
+        from analyzer.keywords import KeywordExtractor
+
+        _keyword_extractor = KeywordExtractor(
+            n_keywords=config.KEYWORDS["n_keywords"],
+            ngram_range=config.KEYWORDS["ngram_range"],
+        )
+    return _keyword_extractor
+
+
+def _extract_keywords_for_articles(articles: list[dict]) -> list[dict]:
+    """Extract keywords for a list of articles.
+
+    Args:
+        articles: List of article dicts with 'content' field
+
+    Returns:
+        Articles with 'keywords' field added
+    """
+    extractor = _get_keyword_extractor()
+
+    for article in articles:
+        content = article.get("content", "")
+        # Combine title for better keyword extraction
+        title = article.get("title", "")
+        combined_text = f"{title} {content}" if content else title
+
+        if combined_text.strip():
+            keywords = extractor.extract_keywords_list(combined_text)
+            article["keywords"] = ",".join(keywords)
+        else:
+            article["keywords"] = ""
+
+    return articles
 
 
 def collect_data(db: Database) -> dict:
@@ -39,6 +83,10 @@ def collect_data(db: Database) -> dict:
         existing_urls = db.get_existing_urls("arXiv")
         new_articles = [a for a in articles if a.get("url") not in existing_urls]
 
+        # Extract keywords for new articles
+        print(f"    Извлечение ключевых слов из {len(new_articles)} статей...")
+        new_articles = _extract_keywords_for_articles(new_articles)
+
         # Prepare articles for bulk insert
         article_dicts = [
             {
@@ -47,6 +95,7 @@ def collect_data(db: Database) -> dict:
                 "content": a["content"],
                 "url": a["url"],
                 "published_at": a["published_at"],
+                "keywords": a.get("keywords", ""),
             }
             for a in new_articles
         ]
@@ -84,6 +133,10 @@ def collect_data(db: Database) -> dict:
         existing_urls = db.get_existing_urls("Habr")
         new_articles = [a for a in articles if a.get("url") not in existing_urls]
 
+        # Extract keywords
+        print(f"    Извлечение ключевых слов из {len(new_articles)} статей...")
+        new_articles = _extract_keywords_for_articles(new_articles)
+
         article_dicts = [
             {
                 "source_id": source_id,
@@ -91,6 +144,7 @@ def collect_data(db: Database) -> dict:
                 "content": a["content"],
                 "url": a["url"],
                 "published_at": a["published_at"],
+                "keywords": a.get("keywords", ""),
             }
             for a in new_articles
         ]
@@ -130,6 +184,10 @@ def collect_data(db: Database) -> dict:
         existing_urls = db.get_existing_urls("Hacker News")
         new_articles = [a for a in articles if a.get("url") not in existing_urls]
 
+        # Extract keywords
+        print(f"    Извлечение ключевых слов из {len(new_articles)} статей...")
+        new_articles = _extract_keywords_for_articles(new_articles)
+
         article_dicts = [
             {
                 "source_id": source_id,
@@ -137,6 +195,7 @@ def collect_data(db: Database) -> dict:
                 "content": a["content"],
                 "url": a["url"],
                 "published_at": a["published_at"],
+                "keywords": a.get("keywords", ""),
             }
             for a in new_articles
         ]
@@ -157,6 +216,8 @@ def collect_data(db: Database) -> dict:
 
     except Exception as e:
         print(f"    ❌ Ошибка сбора Hacker News: {e}")
+
+    # Cross-source deduplication
 
     # Cross-source deduplication (only for newly collected articles)
     if all_new_articles:
@@ -328,9 +389,9 @@ def compare_topics(db: Database) -> None:
                     if isinstance(keywords_b, list)
                     else "",
                     "common_keywords": ",".join(common_kw) if common_kw else "",
-                    "jaccard_similarity": c["jaccard_similarity"],
-                    "cosine_similarity": c["cosine_similarity"],
-                    "is_common": 1 if c["is_common"] else 0,
+                    "jaccard_similarity": float(c["jaccard_similarity"]),
+                    "cosine_similarity": float(c["cosine_similarity"]),
+                    "is_common": 1 if bool(c["is_common"]) else 0,
                 }
             )
 
@@ -490,6 +551,9 @@ def collect_by_topic(
             existing_urls = db.get_existing_urls(source_name)
             new_articles = [a for a in articles if a.get("url") not in existing_urls]
 
+            # Extract keywords
+            new_articles = _extract_keywords_for_articles(new_articles)
+
             # Insert new articles
             article_dicts = [
                 {
@@ -498,6 +562,7 @@ def collect_by_topic(
                     "content": a["content"],
                     "url": a["url"],
                     "published_at": a["published_at"],
+                    "keywords": a.get("keywords", ""),
                 }
                 for a in new_articles
             ]
@@ -534,7 +599,7 @@ def collect_by_topic(
     total = sum(results.values())
     print(f"\n✅ Собрано {total} статей по теме '{topic}'")
 
-    return results
+    return results, all_articles
 
 
 if __name__ == "__main__":

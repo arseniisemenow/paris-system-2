@@ -47,6 +47,13 @@ TOPIC_MODEL = {
     "n_top_words": 10,
 }
 
+# Keyword extraction parameters
+KEYWORDS = {
+    "n_keywords": 10,  # Number of keywords per article/topic
+    "ngram_range": (1, 2),  # (1,1) = unigrams, (1,2) = bigrams, (1,3) = trigrams
+    "min_df": 1,  # Minimum document frequency
+}
+
 # Preprocessing parameters
 PREPROCESSING = {
     "min_word_length": 3,

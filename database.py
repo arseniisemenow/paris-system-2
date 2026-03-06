@@ -166,8 +166,8 @@ class Database:
             cursor = conn.cursor()
             cursor.executemany(
                 """
-                INSERT INTO articles (source_id, title, content, url, published_at)
-                VALUES (:source_id, :title, :content, :url, :published_at)
+                INSERT INTO articles (source_id, title, content, url, published_at, keywords)
+                VALUES (:source_id, :title, :content, :url, :published_at, :keywords)
             """,
                 articles,
             )
